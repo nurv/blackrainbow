@@ -75,6 +75,7 @@ var KEYWORDS = array_to_hash([
     "function",
     "if",
     "in",
+    "as",
     "instanceof",
     "new",
     "return",
@@ -898,6 +899,9 @@ function parse($TEXT, exigent_mode, embed_tokens) {
               case "import":
                 return import_();
 
+              case "from":
+                return from_();
+
               default:
                 unexpected();
             }
@@ -934,9 +938,23 @@ function parse($TEXT, exigent_mode, embed_tokens) {
     };
 
     function from_(){
-        "from a import b as c"
+        
         var pkg = expression();
-        if (is("keyword", "as")) {
+        if (is("keyword", "import")) {
+            next();
+            var pkgName = is("name") ? S.token.value : null;
+            next();
+            var pkg = ['dot', pkg, pkgName];
+            if (is("keyword", "as")){
+                next();
+                pkgName = is("name") ? S.token.value : null;
+                next();
+            }
+            semicolon();
+        }else{
+            croak("From ... requires Import.");
+        }
+        return as("import",pkg,pkgName);
     }
 
     function for_() {
@@ -3105,17 +3123,22 @@ function gen_code(ast, options) {
             globals['package'] = make(name[1])
             return "";
         },
-        'import': function(name){
-            if (name[0] == "name"){
-                var pkgName = name[1];
-            }else if(name[0] == "dot"){
-                var pointer = name[1];
-                while(pointer[0] == "dot"){
-                    pointer = pointer[1]
+        'import': function(pkg,name){
+            if(name == null){
+                if (pkg[0] == "name"){
+                    var name = pkg[1];
+                }else if(pkg[0] == "dot"){
+                    var pointer = pkg[1];
+                    while(pointer[0] == "dot"){
+                        pointer = pointer[1]
+                    }
+                    var name = pointer[1];
+                    var pkg = name;
                 }
-                var pkgName = pointer[1];
+            }else{
+                var pkg = make(pkg);
             }
-            return "var " +pkgName+ " = Package.import('" + pkgName + "');";
+            return "var " + name + " = Package.import('" + pkg + "');";
         },
         "continue": function(label) {
             var out = "continue";
@@ -3292,7 +3315,7 @@ function gen_code(ast, options) {
     if(globals['package']){
         text = "Package.define('" + globals['package'] + "', function(){" + text + "});"
     }
-    return text;
+    return '"use strict";\n' + text;
     // The squeezer replaces "block"-s that contain only a single
     // statement with the statement itself; technically, the AST
     // is correct, but this can create problems when we output an

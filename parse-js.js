@@ -1237,6 +1237,9 @@ var walkers = {
               case "with":
                 return as("with", parenthesised(), statement());
 
+              case "class":
+                return class_();
+
               default:
                 unexpected();
             }
@@ -1349,6 +1352,10 @@ var walkers = {
         var pkg = expression()
         return as("package",pkg)
     };
+
+    function class_(){
+        
+    }
 
     function block_() {
         expect("{");
