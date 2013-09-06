@@ -1186,6 +1186,13 @@ function parse($TEXT, exigent_mode, embed_tokens) {
         return as("import", prog1(expression, semicolon));
     }
 
+    function class_(){
+      var clName = is("name") ? S.token.value : null;
+      next();next();next();
+      
+      return as("class")
+    }
+
     function object_() {
         var first = true, a = [];
         while (!is("punc", "}")) {
@@ -1226,6 +1233,7 @@ function parse($TEXT, exigent_mode, embed_tokens) {
             unexpected();
         }
     };
+    
 
     function subscripts(expr, allow_calls) {
         if (is("punc", ".")) {
