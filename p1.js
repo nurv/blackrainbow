@@ -90,6 +90,7 @@ var KEYWORDS = array_to_hash([
     "with",
     "import",
     "from",
+    'class',
 ]);
 
 var RESERVED_WORDS = array_to_hash([
@@ -902,6 +903,9 @@ function parse($TEXT, exigent_mode, embed_tokens) {
               case "from":
                 return from_();
 
+              case "class":
+                return class_();
+
               default:
                 unexpected();
             }
@@ -1188,9 +1192,20 @@ function parse($TEXT, exigent_mode, embed_tokens) {
 
     function class_(){
       var clName = is("name") ? S.token.value : null;
-      next();next();next();
-      
-      return as("class")
+      next();
+      next();
+      var defs = [];
+      while(!is("punc", "}")){
+        if(is("keyword","var")){
+            next();
+            var dec = prog1(var_, semicolon);
+            defs = defs.concat(dec[1]);
+        }else{
+            throw("Only vardefs and named functions allowed within a class scope")
+        }
+      }
+      next();
+      return as("class", clName, defs)
     }
 
     function object_() {
@@ -1629,6 +1644,9 @@ function ast_walker() {
         },
         "directive": function(dir) {
             return [ this[0], dir ];
+        },
+        "class": function (clName) {
+            return [ this[0], clName, slots ];
         }
     };
 
@@ -1647,7 +1665,11 @@ function ast_walker() {
                     return ret;
             }
             gen = walkers[type];
-            return gen.apply(ast, ast.slice(1));
+            try{
+                return gen.apply(ast, ast.slice(1));
+            }catch(e){
+                throw "Missing walker within tree";
+            }
         } finally {
             stack.pop();
         }
@@ -3128,7 +3150,7 @@ function gen_code(ast, options) {
             return out + ";";
         },
         'package': function(name){
-            globals['package'] = make(name[1])
+            globals['package'] = make(name)
             return "";
         },
         'import': function(pkg,name){
@@ -3318,6 +3340,17 @@ function gen_code(ast, options) {
         },
         "directive": function(dir) {
             return make_string(dir) + ";";
+        },
+        "class": function(clName,slots){
+            var clName = globals["package"]?globals["package"] + "." + clName:clName;
+            var obj = "{"
+            if (slots){
+                obj += "slots:{" + slots.map(function(el){
+                    return el[0] + ":" + make(el[1]);
+                }).join(",") + "}"
+            }
+            obj += "}"
+            return "Class.declare('" + clName + "'," + obj + ");"
         }
     }, function(){ return make(ast) });
     if(globals['package']){

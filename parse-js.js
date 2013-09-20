@@ -1354,7 +1354,7 @@ var walkers = {
     };
 
     function class_(){
-        
+        return as("class")
     }
 
     function block_() {
