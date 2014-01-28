@@ -1687,8 +1687,8 @@ function ast_walker() {
         "directive": function(dir) {
             return [ this[0], dir ];
         },
-        "class": function (clName) {
-            return [ this[0], clName, slots, funcs ];
+        "class": function (clName,slots) {
+            return [ this[0], clName, slots ];
         }
     };
 

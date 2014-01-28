@@ -27,14 +27,17 @@ class Button extends Component mixin Round, UI.circle.bond{
   }
 }
 
-function alpha(){
-	return 1 + 2;
-}
+var x = 1;
+x = 2
 
+function foo(){
+	var x = 2;
+}
 </script>
 			<script>
 				var code = document.getElementById("jquery").innerHTML
-				console.log(exports.gen_code(exports.parse(code)))
+				var pars = exports.parse(code);
+				console.log(exports.gen_code(pars))
 			</script>
 		</div>
 	</body>
