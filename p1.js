@@ -91,6 +91,9 @@ var KEYWORDS = array_to_hash([
     "import",
     "from",
     'class',
+    "static",
+    "extends",
+    "mixin",
 ]);
 
 var RESERVED_WORDS = array_to_hash([
@@ -1191,21 +1194,60 @@ function parse($TEXT, exigent_mode, embed_tokens) {
     }
 
     function class_(){
-      var clName = is("name") ? S.token.value : null;
-      next();
-      next();
-      var defs = [];
-      while(!is("punc", "}")){
-        if(is("keyword","var")){
+        var clName = is("name") ? S.token.value : null;
+        next();
+        var extds = null;
+        var mixins = [];
+        if(is("keyword","extends")){
             next();
-            var dec = prog1(var_, semicolon);
-            defs = defs.concat(dec[1]);
-        }else{
-            throw("Only vardefs and named functions allowed within a class scope")
+            extds = expression(false);
+            if(!(extds[0] == "name" || extds[0] == "dot")){
+                throw("Extends expects a package");
+            }
         }
-      }
+        if(is("keyword","mixin")){
+            while(!is("punc", "{")){
+                next();
+                var extd = expression(false);
+                if(!(extd[0] == "name" || extd[0] == "dot")){
+                    throw("mixin expects a package");
+                }
+                mixins.push(extd)
+            }
+        }
+        next();
+        var defs = [];
+        var funcs = {};
+        var statics = {};
+        var consts = [];
+        while(!is("punc", "}")){
+            if(is("keyword","var")){
+                next();
+                var dec = prog1(var_, semicolon);
+                defs = defs.concat(dec[1]);
+            }else if (is("keyword","static")){
+                next();
+                if (is("keyword","function")){
+                    next();
+                    var f = function_(true);
+                    statics[f[1]] = f;
+                }else if(is("keyword","var")){
+                    // next();
+                    // var dec = prog1(var_, semicolon);
+                    // defs = defs.concat(dec[1]);
+                }else{
+                    throw("Expecting static function");
+                }
+            }else if (is("keyword","function")){
+                next();
+                var f = function_(true);
+                funcs[f[1]] = f;
+            }else{
+                throw("Only vardefs and named functions allowed within a class scope");
+            }
+        }
       next();
-      return as("class", clName, defs)
+      return as("class", clName, defs,funcs,consts,extds,mixins)
     }
 
     function object_() {
@@ -1646,7 +1688,7 @@ function ast_walker() {
             return [ this[0], dir ];
         },
         "class": function (clName) {
-            return [ this[0], clName, slots ];
+            return [ this[0], clName, slots, funcs ];
         }
     };
 
@@ -3106,7 +3148,8 @@ function gen_code(ast, options) {
         },
         "block": make_block,
         "var": function(defs) {
-            return "var " + add_commas(MAP(defs, make_1vardef)) + ";";
+            var z = "var " + add_commas(MAP(defs, make_1vardef)) + ";";
+            return z;
         },
         "const": function(defs) {
             return "const " + add_commas(MAP(defs, make_1vardef)) + ";";
@@ -3341,20 +3384,59 @@ function gen_code(ast, options) {
         "directive": function(dir) {
             return make_string(dir) + ";";
         },
-        "class": function(clName,slots){
+        "class": function(clName,slots,funcs,consts,extds,mixin){
             var clName = globals["package"]?globals["package"] + "." + clName:clName;
             var obj = "{"
+            //return as("class", clName, defs,funcs,consts,extds,mixin)
             if (slots){
                 obj += "slots:{" + slots.map(function(el){
                     return el[0] + ":" + make(el[1]);
                 }).join(",") + "}"
+                if(funcs || consts || extds || mixin){
+                    obj += ","
+                }
             }
+
+            if (funcs){
+                obj += Object.keys(funcs).map(function(k){
+                    var el = funcs[k];
+                    var name = el[1]
+                    el[1] = null;
+                    return name + ":" + make(el);
+                }).join(",")
+                if(consts || extds || mixin){
+                    obj += ","
+                }
+            }
+
+            if (Object.keys(consts).length ){
+                obj += "consts:{" + consts.map(function(el){
+                    return el[0] + ":" + make(el[1]);
+                }).join(",") + "}"
+                if(extds || mixin){
+                    obj += ","
+                }
+            }
+
+            if(extds){
+                obj += "'extends':'" + make(extds) + "'";
+                if(mixin){
+                    obj += ","
+                }
+            }
+
+            if (mixin.length){
+                obj += "mixins:[" + mixin.map(function(el){
+                    return "'" + make(el) + "'";
+                }).join(",") + "]"
+            }
+
             obj += "}"
             return "Class.declare('" + clName + "'," + obj + ");"
         }
     }, function(){ return make(ast) });
     if(globals['package']){
-        text = "Package.define('" + globals['package'] + "', function(){" + text + "});"
+        text = "Package.define('" + globals['package'] + "', function(__package,__exports){" + text + "});"
     }
     return '"use strict";\n' + text;
     // The squeezer replaces "block"-s that contain only a single
