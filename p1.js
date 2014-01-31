@@ -1217,8 +1217,8 @@ function parse($TEXT, exigent_mode, embed_tokens) {
         }
         next();
         var defs = [];
-        var funcs = {};
-        var statics = {};
+        var funcs = [];
+        var statics = [];
         var consts = [];
         while(!is("punc", "}")){
             if(is("keyword","var")){
@@ -1230,7 +1230,7 @@ function parse($TEXT, exigent_mode, embed_tokens) {
                 if (is("keyword","function")){
                     next();
                     var f = function_(true);
-                    statics[f[1]] = f;
+                    statics.push(f);
                 }else if(is("keyword","var")){
                     // next();
                     // var dec = prog1(var_, semicolon);
@@ -1241,7 +1241,7 @@ function parse($TEXT, exigent_mode, embed_tokens) {
             }else if (is("keyword","function")){
                 next();
                 var f = function_(true);
-                funcs[f[1]] = f;
+                funcs.push(f);
             }else{
                 throw("Only vardefs and named functions allowed within a class scope");
             }
@@ -1687,8 +1687,10 @@ function ast_walker() {
         "directive": function(dir) {
             return [ this[0], dir ];
         },
-        "class": function (clName,slots) {
-            return [ this[0], clName, slots ];
+        "class": function (clName,slots,funcs,consts,extds,mixin) {
+            return [ this[0], clName, slots, MAP(funcs, function(p){
+                return walk(p)
+            }),consts,extds,mixin ];
         }
     };
 
@@ -1707,11 +1709,7 @@ function ast_walker() {
                     return ret;
             }
             gen = walkers[type];
-            try{
-                return gen.apply(ast, ast.slice(1));
-            }catch(e){
-                throw "Missing walker within tree";
-            }
+            return gen.apply(ast, ast.slice(1));
         } finally {
             stack.pop();
         }
@@ -3002,10 +3000,23 @@ function gen_code(ast, options) {
     };
 
     function make_name(name) {
+        if(this.isWithinToplevel){
+            var s = this.solve(name);
+            if(s && s[0].toplevel ){
+                return make_name_toplevel(name);
+            }
+        }
         name = name.toString();
         if (options.ascii_only)
             name = to_ascii(name);
         return name;
+    };
+
+    function make_name_toplevel(name) {
+        name = name.toString();
+        if (options.ascii_only)
+            name = to_ascii(name);
+        return "__package." + name;
     };
 
     function indent(line) {
@@ -3148,7 +3159,11 @@ function gen_code(ast, options) {
         },
         "block": make_block,
         "var": function(defs) {
-            var z = "var " + add_commas(MAP(defs, make_1vardef)) + ";";
+            if (!defs.isWithinToplevel()){
+                var z = "var " + add_commas(MAP(defs, make_1vardef)) + ";";
+            }else{
+                var z = "" + add_commas(MAP(defs, make_1vardef_toplevel)) + ";";
+            }
             return z;
         },
         "const": function(defs) {
@@ -3385,7 +3400,6 @@ function gen_code(ast, options) {
             return make_string(dir) + ";";
         },
         "class": function(clName,slots,funcs,consts,extds,mixin){
-            var clName = globals["package"]?globals["package"] + "." + clName:clName;
             var obj = "{"
             //return as("class", clName, defs,funcs,consts,extds,mixin)
             if (slots){
@@ -3398,11 +3412,12 @@ function gen_code(ast, options) {
             }
 
             if (funcs){
-                obj += Object.keys(funcs).map(function(k){
-                    var el = funcs[k];
+                obj += funcs.map(function(el){
                     var name = el[1]
                     el[1] = null;
-                    return name + ":" + make(el);
+                    var result = name + ":" + make(el);
+                    el[1] = name;
+                    return result
                 }).join(",")
                 if(consts || extds || mixin){
                     obj += ","
@@ -3432,11 +3447,14 @@ function gen_code(ast, options) {
             }
 
             obj += "}"
-            return "Class.declare('" + clName + "'," + obj + ");"
+
+            return "__package." + clName + "=Class.declare('" + clName + "'," + obj + ",__package);"
         }
     }, function(){ return make(ast) });
     if(globals['package']){
-        text = "Package.define('" + globals['package'] + "', function(__package,__exports){" + text + "});"
+        text = "Package.declare('" + globals['package'] + "', function(__package){" + text + "});"
+    }else{
+        text = "__package={};" + text
     }
     return '"use strict";\n' + text;
     // The squeezer replaces "block"-s that contain only a single
@@ -3472,7 +3490,17 @@ function gen_code(ast, options) {
     };
 
     function make_function(name, args, body, keyword, no_parens) {
-        var out = keyword || "function";
+        var out = ""
+        if (name) {
+            if(this.isWithinToplevel){
+                var s = this.solve(name);
+                if(s && s[0].toplevel ){
+                    out += "__package." + make_name(name) + "=";
+                }
+            }
+            name = null;
+        }
+        out += keyword || "function";
         if (name) {
             out += " " + make_name(name);
         }
@@ -3544,6 +3572,13 @@ function gen_code(ast, options) {
         var name = def[0], val = def[1];
         if (val != null)
             name = add_spaces([ make_name(name), "=", parenthesize(val, "seq") ]);
+        return name;
+    };
+
+    function make_1vardef_toplevel(def) {
+        var name = def[0], val = def[1];
+        if (val != null)
+            name = add_spaces([ make_name_toplevel(name), "=", parenthesize(val, "seq") ]);
         return name;
     };
 
