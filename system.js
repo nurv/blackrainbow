@@ -175,7 +175,9 @@
             onInitClass: function (cl) {
               if (cl['ctr'] == "autoConfig"){
                 cl['ctr'] = function(cfg){
-                  Class.config(this,cfg);
+                  if(cfg){
+                    Class.config(this,cfg);
+                  }
                 }
               }else if (!cl['ctr']){
                 cl['ctr'] = cl['extends']['ctr'];
@@ -223,7 +225,7 @@
             },
             requires: function(cl){
               // TODO: Lazyloading of classes;
-              return Package.use(cl)
+              return Package.import(cl)
             },
             isDef: isDef,
             toObject: function(instance){
@@ -288,6 +290,7 @@
                   return "#Constructor<" + cnName + ">"
                 }
                 exportPath(cnName, x)
+                return x;
             },
 
             classProcessorOrder: Class.classProcessorOrder,
@@ -440,9 +443,10 @@
     
     Class.declare("Package", {
       statics:{
-        use: function (name) {
+        packages:{},
+        import: function (name) {
             var parts = name.split('.');
-            var cur = window;
+            var cur = Package.packages;
             // Parentheses added to eliminate strict JS warning in Firefox.
             for (var part; parts.length && (part = parts.shift());) {
                 if(!parts.length){
@@ -453,17 +457,16 @@
                   return undefined;
                 }
             }
-          },
+        },
         declare: function(name,func) {
-          var pkg = this.use(name);
+          var pkg = this.import(name);
           if(pkg && !func){
               return pkg;
           }else{
-            var x = func || {};
-            pkg["__name"] = name
+            var pkg = pkg || {};
             (func(pkg))
             exportPath(name,pkg);
-            return x;
+            return pkg;
           }
         },
         requires: function (name){

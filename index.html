@@ -6,59 +6,45 @@
     	<script src="p1.js"></script>
     	<script src="p2.js"></script>
     	<script src="system.js"></script>
+      <script type="text/blackrainbow" src="cp.br"></script>
 	</head>
 	<body>
-		<div>	
-<script type="foo" id="jquery">
-package UI;
-import ders.models;
-from core.av import player as p;
-
-var z = {};
-var alpha=[]
-// var x = 1;
-z['foo'] = 1;
-
-function Test(){
-	var z = 2;
-	alpha = 2;
-	z = 1;
-}
-
-class Button extends Component mixin Round, UI.circle.bond{
-	var x = 1;
-	var y = 2, z = 3;
-
-  static function fromVector(){
-    return x;
-  }
-
-  function hello(x){
-    return x+4;
-  }
-}
-
-
-x = 2
-foo.bar;
-function foo(){
-	x = 2;
-}
-</script>
+		<div>
 			<script>
-				var code = document.getElementById("jquery").innerHTML
-				var pars = exports.parse(code);
-				pars = exports.ast_add_scope(pars);
-				giveBack(pars);
-				pars.scope.toplevel = true;
-				var code = exports.gen_code(pars);
-				console.log(code);
+        var array = document.getElementsByTagName("script")
+        for (var i = 0; i < array.length; i++) {
+            var element = array[i];
+            if (element.getAttribute("type") == "text/blackrainbow"){
+              var request = new XMLHttpRequest
+              request.open('GET', element.getAttribute("src"), true)
+              request.send()
+
+              request.onload = function() {
+                var code = this.response
+                var pars = exports.parse(code);
+                pars = exports.ast_add_scope(pars);
+                giveBack(pars);
+                pars.scope.toplevel = true;
+                var code = exports.gen_code(pars);
+                console.log(code);
+                var s = document.createElement('script');
+                s.type = 'text/javascript';
+                s.appendChild(document.createTextNode(code));
+                document.body.appendChild(s);
+              }
+
+              request.onerror = function() {
+
+              }
+            }
+        };
+
+
 				// var s = document.createElement('script');
     // 		s.type = 'text/javascript';
     // 		s.appendChild(document.createTextNode(code));
     //   	document.body.appendChild(s);
-				// //pars = exports.ast_lift_variables(pars)
-				//console.log(exports.gen_code(pars))
+				//pars = exports.ast_lift_variables(pars)
 			</script>
 		</div>
 	</body>

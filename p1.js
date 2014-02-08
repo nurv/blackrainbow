@@ -1247,7 +1247,7 @@ function parse($TEXT, exigent_mode, embed_tokens) {
             }
         }
       next();
-      return as("class", clName, defs,funcs,consts,extds,mixins)
+      return as("class", clName, defs,funcs,consts,extds,mixins,statics);
     }
 
     function object_() {
@@ -1666,8 +1666,8 @@ function ast_walker() {
         "package": function(lbl) {
             return [ this[0], walk(lbl) ];
         },
-        "import": function(lbl) {
-            return [ this[0], walk(lbl) ];
+        "import": function(lbl,foo) {
+            return [ this[0], walk(lbl),foo];
         },
         "stat": function(stat) {
             return [ this[0], walk(stat) ];
@@ -1925,6 +1925,26 @@ function ast_add_scope(ast) {
             current_scope.labels.refs[label] = true;
     };
 
+    function _clx(clName, defs,funcs,consts,extds,mixins,statics){
+        //as("class", clName, defs,funcs,consts,extds,mixins)
+        define(clName, "class");
+        return [this[0], clName, defs, with_new_scope(function(){
+            return MAP(funcs, walk);
+        }),consts,extds,mixins,statics]
+    };
+
+    function _pkg(pkg){
+        if(pkg[0] == "name"){
+//            define(pkg,"package");
+        }else{
+            while(pkg[0] != "name"){
+                pkg = pkg[1];
+            }
+//            define(pkg[1],"package");
+        }
+        return this;
+    };
+
     return with_new_scope(function(){
         // process AST
         var ret = w.with_walkers({
@@ -1939,6 +1959,8 @@ function ast_add_scope(ast) {
             },
             "var": _vardefs("var"),
             "const": _vardefs("const"),
+            "class": _clx,
+            "package": _pkg,
             "try": function(t, c, f) {
                 if (c != null) return [
                     this[0],
@@ -3181,7 +3203,7 @@ function gen_code(ast, options) {
         "new": function(ctor, args) {
             args = args.length > 0 ? "(" + add_commas(MAP(args, function(expr){
                 return parenthesize(expr, "seq");
-            })) + ")" : "";
+            })) + ")" : "()";
             return add_spaces([ "new", parenthesize(ctor, "seq", "binary", "conditional", "assign", function(expr){
                 var w = ast_walker(), has_call = {};
                 try {
@@ -3208,25 +3230,30 @@ function gen_code(ast, options) {
             return out + ";";
         },
         'package': function(name){
-            globals['package'] = make(name)
+            globals['package'] = make(name);
             return "";
         },
         'import': function(pkg,name){
-            if(name == null){
-                if (pkg[0] == "name"){
-                    var name = pkg[1];
-                }else if(pkg[0] == "dot"){
-                    var pointer = pkg[1];
-                    while(pointer[0] == "dot"){
-                        pointer = pointer[1]
-                    }
-                    var name = pointer[1];
-                    var pkg = name;
+            var obj = ""
+            if (pkg[0] == "name"){
+                var primport = pkg[1];
+                if(!name){
+                    name = primport;
                 }
-            }else{
-                var pkg = make(pkg);
+            }else if(pkg[0] == "dot"){
+                obj = "['" + pkg[2]+ "']" + obj
+                var v = pkg[2]
+                var pointer = pkg[1];
+                while(pointer[0] == "dot"){
+                    obj = "['" + pointer[2]+ "']" + obj
+                    pointer = pointer[1]
+                }
+                primport = pointer[1];
+                if(!name){
+                    name = v;
+                }
             }
-            return "var " + name + " = Package.import('" + pkg + "');";
+            return "var " + name + " = Package.import('" + primport + "')" + obj + ";";
         },
         "continue": function(label) {
             var out = "continue";
@@ -3411,7 +3438,7 @@ function gen_code(ast, options) {
                 }
             }
 
-            if (funcs){
+            if (funcs && funcs.length){
                 obj += funcs.map(function(el){
                     var name = el[1]
                     el[1] = null;
@@ -3424,7 +3451,7 @@ function gen_code(ast, options) {
                 }
             }
 
-            if (Object.keys(consts).length ){
+            if (consts && Object.keys(consts).length ){
                 obj += "consts:{" + consts.map(function(el){
                     return el[0] + ":" + make(el[1]);
                 }).join(",") + "}"
@@ -3442,7 +3469,7 @@ function gen_code(ast, options) {
 
             if (mixin.length){
                 obj += "mixins:[" + mixin.map(function(el){
-                    return "'" + make(el) + "'";
+                    return make(el);
                 }).join(",") + "]"
             }
 
@@ -3489,13 +3516,33 @@ function gen_code(ast, options) {
         return make(th);
     };
 
-    function make_function(name, args, body, keyword, no_parens) {
+    function make_function_toplevel(name, args, body, keyword, no_parens) {
         var out = ""
         if (name) {
-            if(this.isWithinToplevel){
+            if(this.isWithinToplevel && this.isWithinToplevel()){
                 var s = this.solve(name);
                 if(s && s[0].toplevel ){
                     out += "__package." + make_name(name) + "=";
+                }
+            }
+            name = null;
+        }
+        out += keyword || "function";
+        if (name) {
+            out += " " + make_name(name);
+        }
+        out += "(" + add_commas(MAP(args, make_name)) + ")";
+        out = add_spaces([ out, make_block(body) ]);
+        return (!no_parens && needs_parens(this)) ? "(" + out + ")" : out+ ";";
+    };
+
+    function make_function(name, args, body, keyword, no_parens) {
+        var out = ""
+        if (name) {
+            if(this.isWithinToplevel && this.isWithinToplevel()){
+                var s = this.solve(name);
+                if(s && s[0].toplevel ){
+                    return make_function_toplevel.apply(this,[name, args, body, keyword, no_parens])
                 }
             }
             name = null;

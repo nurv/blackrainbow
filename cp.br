@@ -1,0 +1,6 @@
+package geometry;
+
+class Point{
+  var x=0;
+  var y=0;
+}
