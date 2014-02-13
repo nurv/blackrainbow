@@ -1,0 +1,139 @@
+package ui;
+
+class Component{
+  var el=null,
+    template=null,
+    id=null,
+    cls=null,
+    inner=null,
+    tagName=null,
+    composite=null,
+    model=null,
+    events=null;
+
+  function constructor(cfg) {
+    var dflt = this.cls;
+    Class.config(this,cfg);
+    if (dflt){
+      this.cls = dflt + " " + this.cls;
+    }
+  }
+
+  function makeObj(def){
+    var cl = def['class'];
+    delete def['class']
+    var inst = Package.use(cl)(def);
+    def['class'] = cl;
+    return inst
+  }
+
+  function makeFromDef(def,el){
+    if (Object.prototype.toString.apply(def) === '[object Array]'){
+      for (var i=0; i < def.length; i++) {
+        var o = def[i]
+        if(typeof(o) == "string"){
+          el.append(o);
+        }else{
+          var obj = this.makeObj(o)
+          obj.render()
+          el.append(obj.el)
+        }
+      };
+    }else if(typeof(def) == "string"){
+      el.html(def);
+    }else{
+      var obj = this.makeObj(def);
+      obj.render();
+      el.append(obj.el)
+    }
+  }
+
+  function processModel(o) {
+    return o;
+  }
+
+  function render(c,fn){
+    var render;
+    if (!fn) { fn=c; c= null; }
+    var callcc = function (render,fn) {
+      this.el = $(render)
+
+      if (this.id){
+        this.el.attr("id",this.id)
+      }
+
+      if (this.cls){
+        this.el.addClass(this.cls);
+      }
+
+      if (this.inner){
+        this.makeFromDef(this.inner,this.el);
+      }
+
+      if(this.composite){
+        for(var k in this.composite){
+          this.makeFromDef(this.composite[k],$(k,this.el));
+        }
+      }
+
+      if(this.events){
+        for(var k in this.events){
+          var ev = k.split(" ")[0]
+          var se = k.slice(ev.length + 1);
+          if (typeof(this.events[k]) == "string"){
+            $(se,this.el).on(ev,_.bind(this[this.events[k]],this));
+          }else{
+            $(se,this.el).on(ev,this.events[k]);
+          }
+        }
+      }
+      fn.apply(this);
+    }
+
+    callcc = _.bind(callcc,this);
+
+    if (this.template){
+      var http = new XMLHttpRequest();
+
+      http.open("GET", this.template + ".html" , false);
+      http.onreadystatechange = function(){
+        if (http.readyState==4 && http.status==200)
+        {
+
+        }
+      }
+      http.send(null);
+      var context = c || (this.model && this.processModel(this.model))
+
+      Template.render(http.responseText,context,function (err,data) {
+        if (err) throw err;
+        callcc($(data),fn);
+      })
+    }else if(this.tagName){
+      callcc($("<" + this.tagName + ">" + "</" + this.tagName+ ">"),fn);
+    }
+  }
+}
+
+class Button extends Component{
+  var tagName = "button", cls = "btn";
+}
+
+
+class Icon {
+    var tagName="i";
+}
+
+
+class View extends Component{
+  var attachAt = null;
+
+  function render() {
+    Class.super(this,"render");
+    $(this.attachAt).html(this.el)
+  }
+
+  function unrender(){
+    $(this.el).remove();
+  }
+}

@@ -94,6 +94,7 @@ var KEYWORDS = array_to_hash([
     "static",
     "extends",
     "mixin",
+    "auto",
 ]);
 
 var RESERVED_WORDS = array_to_hash([
@@ -127,7 +128,8 @@ var RESERVED_WORDS = array_to_hash([
     "synchronized",
     "throws",
     "transient",
-    "volatile"
+    "volatile",
+    "auto"
 ]);
 
 var KEYWORDS_BEFORE_EXPRESSION = array_to_hash([
@@ -1225,7 +1227,18 @@ function parse($TEXT, exigent_mode, embed_tokens) {
                 next();
                 var dec = prog1(var_, semicolon);
                 defs = defs.concat(dec[1]);
-            }else if (is("keyword","static")){
+            }
+            // else if (is("keyword","auto")){
+            //     next();
+            //     if (is("name","constructor")){
+            //         funcs.push(["autoconf","constructor"]);
+            //     }
+            //     next();
+            //     if (!is("punc", ";"))
+            //         continue;
+            //     next();
+            // }
+            else if (is("keyword","static")){
                 next();
                 if (is("keyword","function")){
                     next();
@@ -3461,7 +3474,7 @@ function gen_code(ast, options) {
             }
 
             if(extds){
-                obj += "'extends':'" + make(extds) + "'";
+                obj += "'extends':" + make(extds) + "";
                 if(mixin){
                     obj += ","
                 }

@@ -446,7 +446,7 @@
         packages:{},
         import: function (name) {
             var parts = name.split('.');
-            var cur = Package.packages;
+            var cur = window;
             // Parentheses added to eliminate strict JS warning in Firefox.
             for (var part; parts.length && (part = parts.shift());) {
                 if(!parts.length){

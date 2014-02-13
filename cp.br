@@ -1,6 +1,17 @@
 package geometry;
+from lang import AutoConf;
 
-class Point{
+class Point extends AutoConf{
   var x=0;
   var y=0;
 }
+
+class Size extends AutoConf{
+  var height = 0;
+  var width = 0;
+}
+
+class Rect extends AutoConf mixin Point, Size{}
+
+var p = new Rect({ x:1, y:2, height:10, width:10 });
+console.log(p.x)

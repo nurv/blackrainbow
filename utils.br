@@ -1,0 +1,47 @@
+package utils;
+from events import HasEvents;
+
+class List extends HasEvents{
+  var l = null;
+
+  function constructor(lst){
+    if (lst){
+      if (Object.prototype.toString.apply(lst) === '[object Array]'){
+        this.l = Array.prototype.slice(lst);
+      }else{
+        this.l = [ lst ]
+      }
+    }else{
+      this.l = []
+    }
+  }
+
+  function set(a,o) {
+    if (!o){
+      this.l.push(a);
+      this.trigger("added",a,this.l.length - 1);
+    }else{
+      this.l[a] = o;
+      this.trigger("added",o,a);
+    }
+  }
+
+  function get(i){
+    return this.l[i];
+  }
+
+  function remove(i){
+    if (i in this.l){
+      this.l.remove(i)
+      this.trigger("removed",i);
+    }else{
+      var o = this.l[i];
+      this.l[i] = undefined;
+      this.trigger("removed",o);
+    }
+  }
+
+  function size(i){
+    return this.l.length;
+  }
+}

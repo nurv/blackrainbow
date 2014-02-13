@@ -1,0 +1,9 @@
+package lang;
+
+class AutoConf{
+    function constructor(cfg){
+        if(cfg){
+          Class.config(this,cfg);
+        }
+    }
+}

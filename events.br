@@ -1,0 +1,98 @@
+package events;
+
+class Signal{
+    var listeners = [];
+
+    function _isRegistered(callback){
+        if( this.listeners.length == 0 ) return false;
+
+        for( var index in this.listeners ) if( this.listeners[index].callback == callback ) return true;
+        return false;
+    }
+
+    function add(callback){
+      if( !callback || typeof callback != "function" ){ throw new Error("Error: Callback is undefined or not a function."); return; };
+      if( this._isRegistered( callback ) ) return;
+
+      this.listeners.push({callback: callback, once: false});
+    }
+
+    function addOnce(callback){
+        if( !callback || typeof callback != "function" ){ throw new Error("Error: Callback is undefined or not a function."); return; };
+        if( this._isRegistered( callback ) ) return;
+
+        this.listeners.push({callback: callback, once: true});
+    }
+
+    function dispatch(){
+
+        if( this.listeners.length == 0 ) return;
+
+        var i = 0, n = this.listeners.length, listener;
+        for(; i<n; i++)
+        {
+            listener = this.listeners[i];
+            listener.callback.apply(null, arguments);
+
+            if( !listener.once ) continue;
+            this.listeners.splice(i,1);
+
+            i--;
+            n--;
+        };
+    }
+
+    function remove(callback){
+            if( _listeners.length == 0 ) return;
+
+            var index, listener;
+            for( index in this.listeners )
+            {
+                    listener = this.listeners[index];
+                    if( listener.callback != callback ) continue;
+
+                    this.listeners.splice(index,1);
+                    break;
+            };
+    }
+
+    function removeAll(){ this.listeners = []; }
+}
+
+class HasEvents{
+  var events = null;
+
+  function on(type, callback) {
+    if (!this.events){ this.events = {}; }
+
+    if (!this.events[type]){
+      this.events[type] = new Signal();
+    }
+
+    this.events[type].add(callback);
+  }
+
+  function off(type,callback) {
+    if (!this.events){ return; }
+
+    if (!this.events[type]){
+      return;
+    }
+
+      if (callback){
+        this.events[type].remove(callback);
+      }else{
+        this.events[type].removeAll();
+      }
+    }
+
+  function trigger() {
+    if (!this.events){ return; }
+
+    var args = Array.prototype.slice.call(arguments);
+
+    if (this.events[arguments[0]]){
+      this.events[arguments[0]].dispatch.apply(this, args.slice(1));
+    }
+  }
+}
